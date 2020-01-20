@@ -4,7 +4,7 @@
  * Флаг решения дополнительной задачи
  * @see README.md
  */
-const isExtraTaskSolved = false;
+const isExtraTaskSolved = true;
 
 /**
  * @param {Object} schedule Расписание Банды
@@ -15,13 +15,93 @@ const isExtraTaskSolved = false;
  * @returns {Object}
  */
 function getAppropriateMoment(schedule, duration, workingHours) {
+  const days = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
+  const minutesPerDay = 24 * 60;
+  const actorCount = 3;
+  const deadlineDay = 2;
+  const delay = 30;
+
+  /**
+   * @param {string} data Форматированные дата и время
+   * @returns {{timezone: number, time: number}}
+   */
+  const parseMoment = function(data) {
+    const match = data.match(/^([А-Я]{2} )?(\d{2}):(\d{2})\+(\d+)$/);
+    const day = typeof match[1] === 'undefined' ? 0 : days.indexOf(match[0].substring(0, 2));
+    const hour = Number(match[2]);
+    const minute = Number(match[3]);
+    const timezone = Number(match[4]);
+
+    return { time: (day * 24 + hour) * 60 + minute, timezone: timezone };
+  };
+
+  const bankDailyFrom = parseMoment(workingHours.from);
+  const bankDailyTo = parseMoment(workingHours.to);
+  const bankTimezone = bankDailyFrom.timezone;
+  const events = [];
+
+  /**
+   * @param {string} actor Имя объекта
+   * @param {Object}from Начало промежутка
+   * @param {Object}to Конец промежутка
+   * @param {boolean} ready Готов ли объект в этот промежуток
+   */
+  const addEvent = function(actor, from, to, ready) {
+    events.push({
+      time: from.time + (bankTimezone - from.timezone) * 60,
+      actor: actor,
+      ready: ready
+    });
+    events.push({
+      time: to.time + (bankTimezone - to.timezone) * 60,
+      actor: actor,
+      ready: !ready
+    });
+  };
+
+  const robberyFrom = { time: 0, timezone: bankDailyFrom.timezone };
+  const robberyTo = { time: (deadlineDay + 1) * minutesPerDay, timezone: bankDailyFrom.timezone };
+  addEvent('robbery', robberyFrom, robberyTo, true);
+
+  for (let i = 0; i < days.length; i++) {
+    const bankFrom = { time: bankDailyFrom.time + i * minutesPerDay, timezone: bankTimezone };
+    const bankTo = { time: bankDailyTo.time + i * minutesPerDay, timezone: bankTimezone };
+    addEvent('bank', bankFrom, bankTo, true);
+  }
+
+  for (let i = 0; i < actorCount; i++) {
+    const robberSchedule = Object.values(schedule)[i];
+    for (const interval of robberSchedule) {
+      const robberFrom = parseMoment(interval.from);
+      const robberTo = parseMoment(interval.to);
+      addEvent('robber#' + (i + 1), robberFrom, robberTo, false);
+    }
+  }
+
+  events.sort((a, b) => a.time - b.time);
+  const goodIntervals = [];
+
+  let readyActors = actorCount;
+  let currentTime = 0;
+  for (const event of events) {
+    const previousTime = currentTime;
+    currentTime = event.time;
+    if (readyActors === actorCount + 2 && currentTime - previousTime >= duration) {
+      goodIntervals.push({ fromTime: previousTime, toTime: currentTime });
+    }
+    readyActors += event.ready ? 1 : -1;
+  }
+
+  let currentIntervalIndex = 0;
+  let currentOffset = 0;
+
   return {
     /**
      * Найдено ли время
      * @returns {boolean}
      */
     exists() {
-      return false;
+      return goodIntervals.length > 0;
     },
 
     /**
@@ -37,7 +117,19 @@ function getAppropriateMoment(schedule, duration, workingHours) {
      * ```
      */
     format(template) {
-      return template;
+      if (!this.exists()) {
+        return '';
+      }
+
+      const time = goodIntervals[currentIntervalIndex].fromTime + currentOffset;
+      const day = Math.floor(time / 60 / 24);
+      const hour = Math.floor(time / 60) % 24;
+      const minute = time % 60;
+
+      return template
+        .replace(/%DD/g, days[day])
+        .replace(/%HH/g, ('0' + hour).slice(-2))
+        .replace(/%MM/g, ('0' + minute).slice(-2));
     },
 
     /**
@@ -46,7 +138,22 @@ function getAppropriateMoment(schedule, duration, workingHours) {
      * @returns {boolean}
      */
     tryLater() {
-      return false;
+      if (!this.exists()) {
+        return false;
+      }
+
+      const previousIntervalIndex = currentIntervalIndex;
+      const currentInterval = goodIntervals[currentIntervalIndex];
+      const availableDuration = currentInterval.toTime - currentInterval.fromTime - currentOffset;
+      if (availableDuration - delay >= duration) {
+        currentOffset += delay;
+
+        return true;
+      }
+      currentIntervalIndex = Math.min(currentIntervalIndex + 1, goodIntervals.length - 1);
+      currentOffset = 0;
+
+      return currentIntervalIndex !== previousIntervalIndex;
     }
   };
 }
