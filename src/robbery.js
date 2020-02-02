@@ -38,21 +38,21 @@ class Scheduler extends Array {
   }
 
   /**
-   * @param {string} actor Имя объекта
-   * @param {Object}from Начало промежутка
-   * @param {Object}to Конец промежутка
-   * @param {boolean} ready Готов ли объект в этот промежуток
+   * @param {string} options.actor Имя объекта
+   * @param {Object} options.from Начало промежутка
+   * @param {Object} options.to Конец промежутка
+   * @param {boolean} options.ready Готов ли объект в этот промежуток
    */
-  addEvent(actor, from, to, ready) {
+  addEvent(options) {
     this.push({
-      time: from.time + (this.timezone - from.timezone) * MINUTES_PER_HOUR,
-      actor,
-      ready: ready
+      time: options.from.time + (this.timezone - options.from.timezone) * MINUTES_PER_HOUR,
+      actor: options.actor,
+      ready: options.ready
     });
     this.push({
-      time: to.time + (this.timezone - to.timezone) * MINUTES_PER_HOUR,
-      actor,
-      ready: !ready
+      time: options.to.time + (this.timezone - options.to.timezone) * MINUTES_PER_HOUR,
+      actor: options.actor,
+      ready: !options.ready
     });
   }
 }
@@ -71,28 +71,31 @@ function getAppropriateMoment(schedule, duration, workingHours) {
   const { timezone: bankTimezone } = bankDailyFrom;
   const scheduler = new Scheduler(bankTimezone);
 
-  const robberyFrom = { time: 0, timezone: bankDailyFrom.timezone };
-  const robberyTo = {
-    time: (DEADLINE_DAY + 1) * MINUTES_PER_DAY,
-    timezone: bankDailyFrom.timezone
-  };
-
-  scheduler.addEvent('robbery', robberyFrom, robberyTo, true);
+  scheduler.addEvent({
+    actor: 'robbery',
+    from: { time: 0, timezone: bankDailyFrom.timezone },
+    to: { time: (DEADLINE_DAY + 1) * MINUTES_PER_DAY, timezone: bankDailyFrom.timezone },
+    ready: true
+  });
 
   for (let i = 0; i < DAYS.length; i++) {
-    const bankFrom = { time: bankDailyFrom.time + i * MINUTES_PER_DAY, timezone: bankTimezone };
-    const bankTo = { time: bankDailyTo.time + i * MINUTES_PER_DAY, timezone: bankTimezone };
-
-    scheduler.addEvent('bank', bankFrom, bankTo, true);
+    scheduler.addEvent({
+      actor: 'bank',
+      from: { time: bankDailyFrom.time + i * MINUTES_PER_DAY, timezone: bankTimezone },
+      to: { time: bankDailyTo.time + i * MINUTES_PER_DAY, timezone: bankTimezone },
+      ready: true
+    });
   }
 
   for (let i = 0; i < ACTOR_COUNT; i++) {
     const robberSchedule = Object.values(schedule)[i];
     for (const interval of robberSchedule) {
-      const robberFrom = parseMoment(interval.from);
-      const robberTo = parseMoment(interval.to);
-
-      scheduler.addEvent('robber#' + (i + 1), robberFrom, robberTo, false);
+      scheduler.addEvent({
+        actor: 'robber#' + (i + 1),
+        from: parseMoment(interval.from),
+        to: parseMoment(interval.to),
+        ready: false
+      });
     }
   }
 
