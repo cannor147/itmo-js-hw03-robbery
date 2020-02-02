@@ -101,22 +101,23 @@ function getAppropriateMoment(schedule, duration, workingHours) {
 
   scheduler.sort((a, b) => a.time - b.time);
   const goodIntervals = [];
-
   let readyActors = ACTOR_COUNT;
   let currentTime = 0;
+
   for (const event of scheduler) {
     const previousTime = currentTime;
     currentTime = event.time;
+
     if (readyActors === ACTOR_COUNT + 2 && currentTime - previousTime >= duration) {
       goodIntervals.push({ fromTime: previousTime, toTime: currentTime });
     }
     readyActors += event.ready ? 1 : -1;
   }
 
-  let currentIntervalIndex = 0;
-  let currentOffset = 0;
-
   return {
+    intervalIndex: 0,
+    offset: 0,
+
     /**
      * Найдено ли время
      * @returns {boolean}
@@ -142,7 +143,7 @@ function getAppropriateMoment(schedule, duration, workingHours) {
         return '';
       }
 
-      const time = goodIntervals[currentIntervalIndex].fromTime + currentOffset;
+      const time = goodIntervals[this.intervalIndex].fromTime + this.offset;
       const day = Math.floor(time / MINUTES_PER_DAY);
       const hour = Math.floor(time / MINUTES_PER_HOUR) % HOURS_PER_DAY;
       const minute = time % MINUTES_PER_HOUR;
@@ -163,18 +164,18 @@ function getAppropriateMoment(schedule, duration, workingHours) {
         return false;
       }
 
-      const previousIntervalIndex = currentIntervalIndex;
-      const currentInterval = goodIntervals[currentIntervalIndex];
-      const availableDuration = currentInterval.toTime - currentInterval.fromTime - currentOffset;
+      const previousIntervalIndex = this.intervalIndex;
+      const currentInterval = goodIntervals[this.intervalIndex];
+      const availableDuration = currentInterval.toTime - currentInterval.fromTime - this.offset;
       if (availableDuration - DELAY >= duration) {
-        currentOffset += DELAY;
+        this.offset += DELAY;
 
         return true;
       }
-      currentIntervalIndex = Math.min(currentIntervalIndex + 1, goodIntervals.length - 1);
-      currentOffset = 0;
+      this.intervalIndex = Math.min(this.intervalIndex + 1, goodIntervals.length - 1);
+      this.offset = 0;
 
-      return currentIntervalIndex !== previousIntervalIndex;
+      return this.intervalIndex !== previousIntervalIndex;
     }
   };
 }
