@@ -73,8 +73,8 @@ function getAppropriateMoment(schedule, duration, workingHours) {
 
   scheduler.addEvent({
     actor: 'robbery',
-    from: { time: 0, timezone: bankDailyFrom.timezone },
-    to: { time: (DEADLINE_DAY + 1) * MINUTES_PER_DAY, timezone: bankDailyFrom.timezone },
+    from: { time: 0, timezone: bankTimezone },
+    to: { time: (DEADLINE_DAY + 1) * MINUTES_PER_DAY, timezone: bankTimezone },
     ready: true
   });
 
