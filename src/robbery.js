@@ -6,6 +6,14 @@
  */
 const isExtraTaskSolved = true;
 
+const DAYS = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
+const MINUTES_PER_HOUR = 60;
+const HOURS_PER_DAY = 24;
+const MINUTES_PER_DAY = MINUTES_PER_HOUR * HOURS_PER_DAY;
+const ACTOR_COUNT = 3;
+const DEADLINE_DAY = 2;
+const DELAY = 30;
+
 /**
  * @param {Object} schedule Расписание Банды
  * @param {number} duration Время на ограбление в минутах
@@ -15,24 +23,18 @@ const isExtraTaskSolved = true;
  * @returns {Object}
  */
 function getAppropriateMoment(schedule, duration, workingHours) {
-  const days = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
-  const minutesPerDay = 24 * 60;
-  const actorCount = 3;
-  const deadlineDay = 2;
-  const delay = 30;
-
   /**
    * @param {string} data Форматированные дата и время
    * @returns {{timezone: number, time: number}}
    */
   const parseMoment = function(data) {
     const match = data.match(/^([А-Я]{2} )?(\d{2}):(\d{2})\+(\d+)$/);
-    const day = typeof match[1] === 'undefined' ? 0 : days.indexOf(match[0].substring(0, 2));
+    const day = typeof match[1] === 'undefined' ? 0 : DAYS.indexOf(match[0].substring(0, 2));
     const hour = Number(match[2]);
     const minute = Number(match[3]);
     const timezone = Number(match[4]);
 
-    return { time: (day * 24 + hour) * 60 + minute, timezone: timezone };
+    return { time: (day * HOURS_PER_DAY + hour) * MINUTES_PER_HOUR + minute, timezone: timezone };
   };
 
   const bankDailyFrom = parseMoment(workingHours.from);
@@ -48,28 +50,31 @@ function getAppropriateMoment(schedule, duration, workingHours) {
    */
   const addEvent = function(actor, from, to, ready) {
     events.push({
-      time: from.time + (bankTimezone - from.timezone) * 60,
+      time: from.time + (bankTimezone - from.timezone) * MINUTES_PER_HOUR,
       actor: actor,
       ready: ready
     });
     events.push({
-      time: to.time + (bankTimezone - to.timezone) * 60,
+      time: to.time + (bankTimezone - to.timezone) * MINUTES_PER_HOUR,
       actor: actor,
       ready: !ready
     });
   };
 
   const robberyFrom = { time: 0, timezone: bankDailyFrom.timezone };
-  const robberyTo = { time: (deadlineDay + 1) * minutesPerDay, timezone: bankDailyFrom.timezone };
+  const robberyTo = {
+    time: (DEADLINE_DAY + 1) * MINUTES_PER_DAY,
+    timezone: bankDailyFrom.timezone
+  };
   addEvent('robbery', robberyFrom, robberyTo, true);
 
-  for (let i = 0; i < days.length; i++) {
-    const bankFrom = { time: bankDailyFrom.time + i * minutesPerDay, timezone: bankTimezone };
-    const bankTo = { time: bankDailyTo.time + i * minutesPerDay, timezone: bankTimezone };
+  for (let i = 0; i < DAYS.length; i++) {
+    const bankFrom = { time: bankDailyFrom.time + i * MINUTES_PER_DAY, timezone: bankTimezone };
+    const bankTo = { time: bankDailyTo.time + i * MINUTES_PER_DAY, timezone: bankTimezone };
     addEvent('bank', bankFrom, bankTo, true);
   }
 
-  for (let i = 0; i < actorCount; i++) {
+  for (let i = 0; i < ACTOR_COUNT; i++) {
     const robberSchedule = Object.values(schedule)[i];
     for (const interval of robberSchedule) {
       const robberFrom = parseMoment(interval.from);
@@ -81,12 +86,12 @@ function getAppropriateMoment(schedule, duration, workingHours) {
   events.sort((a, b) => a.time - b.time);
   const goodIntervals = [];
 
-  let readyActors = actorCount;
+  let readyActors = ACTOR_COUNT;
   let currentTime = 0;
   for (const event of events) {
     const previousTime = currentTime;
     currentTime = event.time;
-    if (readyActors === actorCount + 2 && currentTime - previousTime >= duration) {
+    if (readyActors === ACTOR_COUNT + 2 && currentTime - previousTime >= duration) {
       goodIntervals.push({ fromTime: previousTime, toTime: currentTime });
     }
     readyActors += event.ready ? 1 : -1;
@@ -122,12 +127,12 @@ function getAppropriateMoment(schedule, duration, workingHours) {
       }
 
       const time = goodIntervals[currentIntervalIndex].fromTime + currentOffset;
-      const day = Math.floor(time / 60 / 24);
-      const hour = Math.floor(time / 60) % 24;
-      const minute = time % 60;
+      const day = Math.floor(time / MINUTES_PER_DAY);
+      const hour = Math.floor(time / MINUTES_PER_HOUR) % HOURS_PER_DAY;
+      const minute = time % MINUTES_PER_HOUR;
 
       return template
-        .replace(/%DD/g, days[day])
+        .replace(/%DD/g, DAYS[day])
         .replace(/%HH/g, ('0' + hour).slice(-2))
         .replace(/%MM/g, ('0' + minute).slice(-2));
     },
@@ -145,8 +150,8 @@ function getAppropriateMoment(schedule, duration, workingHours) {
       const previousIntervalIndex = currentIntervalIndex;
       const currentInterval = goodIntervals[currentIntervalIndex];
       const availableDuration = currentInterval.toTime - currentInterval.fromTime - currentOffset;
-      if (availableDuration - delay >= duration) {
-        currentOffset += delay;
+      if (availableDuration - DELAY >= duration) {
+        currentOffset += DELAY;
 
         return true;
       }
