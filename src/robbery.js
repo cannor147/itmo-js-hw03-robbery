@@ -15,6 +15,20 @@ const DEADLINE_DAY = 2;
 const DELAY = 30;
 
 /**
+ * @param {string} data Форматированные дата и время
+ * @returns {{timezone: number, time: number}}
+ */
+const parseMoment = function(data) {
+  const tokens = data.match(/^([А-Я]{2} )?(\d{2}):(\d{2})\+(\d+)$/);
+  const day = typeof tokens[1] === 'undefined' ? 0 : DAYS.indexOf(tokens[0].substring(0, 2));
+  const hour = Number(tokens[2]);
+  const minute = Number(tokens[3]);
+  const timezone = Number(tokens[4]);
+
+  return { time: (day * HOURS_PER_DAY + hour) * MINUTES_PER_HOUR + minute, timezone: timezone };
+};
+
+/**
  * @param {Object} schedule Расписание Банды
  * @param {number} duration Время на ограбление в минутах
  * @param {Object} workingHours Время работы банка
@@ -23,20 +37,6 @@ const DELAY = 30;
  * @returns {Object}
  */
 function getAppropriateMoment(schedule, duration, workingHours) {
-  /**
-   * @param {string} data Форматированные дата и время
-   * @returns {{timezone: number, time: number}}
-   */
-  const parseMoment = function(data) {
-    const match = data.match(/^([А-Я]{2} )?(\d{2}):(\d{2})\+(\d+)$/);
-    const day = typeof match[1] === 'undefined' ? 0 : DAYS.indexOf(match[0].substring(0, 2));
-    const hour = Number(match[2]);
-    const minute = Number(match[3]);
-    const timezone = Number(match[4]);
-
-    return { time: (day * HOURS_PER_DAY + hour) * MINUTES_PER_HOUR + minute, timezone: timezone };
-  };
-
   const bankDailyFrom = parseMoment(workingHours.from);
   const bankDailyTo = parseMoment(workingHours.to);
   const bankTimezone = bankDailyFrom.timezone;
